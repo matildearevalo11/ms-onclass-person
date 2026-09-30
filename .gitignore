@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+/out/
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# Local environment
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Private signing keys
+*.pem
+!src/test/resources/keys/*.pem
