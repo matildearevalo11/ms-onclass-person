@@ -49,7 +49,7 @@ class AuthenticationIntegrationTest {
         StepVerifier.create(database.sql("DELETE FROM users").fetch().rowsUpdated()
                 .then(database.sql("DELETE FROM roles").fetch().rowsUpdated())
                 .then(database.sql("INSERT INTO roles (id, name) VALUES (1, 'ADMIN')").fetch().rowsUpdated())
-                .then(database.sql("INSERT INTO users (id, email, password_hash, role_id) VALUES (1, 'admin@example.com', :hash, 1)")
+                .then(database.sql("INSERT INTO users (id, name, email, password_hash, role_id) VALUES (1, 'Admin User', 'admin@example.com', :hash, 1)")
                         .bind("hash", hash).fetch().rowsUpdated()).then()).verifyComplete();
     }
 
@@ -101,6 +101,21 @@ class AuthenticationIntegrationTest {
         login("", "").expectStatus().isBadRequest().expectBody()
                 .jsonPath("$.errors.message").isEqualTo(ExceptionMessages.CREDENTIALS_REQUIRED.getMessage());
         verifyNoInteractions(handler);
+    }
+
+    @Test
+    void returnsOnlyRequestedPersonNamesAndEmailsToAdmin() {
+        String token = login("admin@example.com", "test-password").expectStatus().isOk()
+                .expectBody(TokenResponseDto.class).returnResult().getResponseBody().getAccessToken();
+
+        client.get().uri("/persons?ids=1,99").headers(headers -> headers.setBearerAuth(token))
+                .exchange().expectStatus().isOk().expectBody()
+                .jsonPath("$[0].id").isEqualTo(1)
+                .jsonPath("$[0].name").isEqualTo("Admin User")
+                .jsonPath("$[0].email").isEqualTo("admin@example.com")
+                .jsonPath("$[0].passwordHash").doesNotExist()
+                .jsonPath("$.length()").isEqualTo(1);
+        client.get().uri("/persons?ids=1").exchange().expectStatus().isUnauthorized();
     }
 
     private WebTestClient.ResponseSpec login(String email, String password) {

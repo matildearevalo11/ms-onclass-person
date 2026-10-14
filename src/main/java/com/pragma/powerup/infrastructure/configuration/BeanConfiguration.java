@@ -5,6 +5,9 @@ import com.pragma.powerup.domain.spi.IAccountPersistencePort;
 import com.pragma.powerup.domain.spi.IPasswordVerifierPort;
 import com.pragma.powerup.domain.spi.ITokenProviderPort;
 import com.pragma.powerup.domain.usecase.AuthenticationUseCase;
+import com.pragma.powerup.domain.api.IPersonQueryServicePort;
+import com.pragma.powerup.domain.spi.IPersonQueryPort;
+import com.pragma.powerup.domain.usecase.PersonQueryUseCase;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +16,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 public class BeanConfiguration {
+    @Bean
+    IPersonQueryServicePort personQueryServicePort(IPersonQueryPort queryPort) {
+        return new PersonQueryUseCase(queryPort);
+    }
     @Bean
     IAuthenticationServicePort authenticationServicePort(IAccountPersistencePort accounts,
             IPasswordVerifierPort passwords, ITokenProviderPort tokens) {
