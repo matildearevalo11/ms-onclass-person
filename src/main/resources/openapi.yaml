@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: On-Class Person API
+  version: 1.0.0
+  description: Microservicio de personas.
+servers:
+  - url: /api/v1
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Autenticar usuario
+      description: Valida las credenciales y genera un JWT con el rol del usuario.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token generado.
+          headers:
+            Cache-Control:
+              description: Evita almacenar el token en caché.
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          description: Correo obligatorio.
+          example: admin@example.com
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          description: Contraseña obligatoria.
+    TokenResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: JWT para el encabezado Authorization.
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Vigencia del token en segundos.
+          example: 900
+    ErrorResponse:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: object
+          required: [message]
+          properties:
+            message:
+              type: string
+  responses:
+    BadRequest:
+      description: Solicitud inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Autenticación fallida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Error interno del servidor.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: No se pudo completar la operación en la base de datos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
