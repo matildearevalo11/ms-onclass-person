@@ -5,7 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import com.pragma.powerup.application.dto.response.TokenResponseDto;
 import com.pragma.powerup.domain.exception.ExceptionMessages;
-import com.pragma.powerup.application.handler.IAuthenticationHandler;
+import com.pragma.powerup.domain.spi.IAccountPersistencePort;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import java.io.IOException;
@@ -39,7 +39,7 @@ class AuthenticationIntegrationTest {
     @Value("${jwt.secret}")
     private String secret;
     @MockitoSpyBean
-    private IAuthenticationHandler handler;
+    private IAccountPersistencePort accounts;
     @Autowired
     private WebTestClient client;
 
@@ -97,10 +97,10 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void rejectsMissingCredentialsBeforeCallingTheHandler() {
+    void rejectsMissingCredentialsBeforeQueryingAccounts() {
         login("", "").expectStatus().isBadRequest().expectBody()
                 .jsonPath("$.errors.message").isEqualTo(ExceptionMessages.CREDENTIALS_REQUIRED.getMessage());
-        verifyNoInteractions(handler);
+        verifyNoInteractions(accounts);
     }
 
     @Test
@@ -116,6 +116,25 @@ class AuthenticationIntegrationTest {
                 .jsonPath("$[0].passwordHash").doesNotExist()
                 .jsonPath("$.length()").isEqualTo(1);
         client.get().uri("/persons?ids=1").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void rejectsMissingOrInvalidPersonIds() {
+        String token = login("admin@example.com", "test-password").expectStatus().isOk()
+                .expectBody(TokenResponseDto.class).returnResult().getResponseBody().getAccessToken();
+
+        for (String uri : new String[] {"/persons", "/persons?ids=abc", "/persons?ids=0"}) {
+            client.get().uri(uri).headers(headers -> headers.setBearerAuth(token))
+                    .exchange().expectStatus().isBadRequest()
+                    .expectBody().jsonPath("$.errors.message").isNotEmpty();
+        }
+    }
+
+    @Test
+    void rejectsMalformedLoginBody() {
+        client.post().uri("/auth/login").contentType(MediaType.APPLICATION_JSON).bodyValue("{bad json")
+                .exchange().expectStatus().isBadRequest()
+                .expectBody().jsonPath("$.errors.message").isEqualTo(ExceptionMessages.INVALID_REQUEST.getMessage());
     }
 
     private WebTestClient.ResponseSpec login(String email, String password) {

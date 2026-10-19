@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 class AuthenticationUseCaseTest {
@@ -28,5 +29,35 @@ class AuthenticationUseCaseTest {
                         && error.getMessage().equals(ExceptionMessages.INVALID_CREDENTIALS.getMessage()))
                 .verify();
         verifyNoInteractions(passwords, tokens);
+    }
+
+    @Test
+    void requiresEmailAndPasswordBeforeQueryingAccounts() {
+        var accounts = mock(IAccountPersistencePort.class);
+        var passwords = mock(IPasswordVerifierPort.class);
+        var tokens = mock(ITokenProviderPort.class);
+        var useCase = new AuthenticationUseCase(accounts, passwords, tokens);
+
+        for (var credentials : java.util.List.of(new LoginCredentials(" ", "secret"),
+                new LoginCredentials("admin@example.com", ""), new LoginCredentials(null, null))) {
+            StepVerifier.create(useCase.login(credentials))
+                    .expectErrorMatches(error -> error instanceof com.pragma.powerup.domain.exception.ValidationException
+                            && error.getMessage().equals(ExceptionMessages.CREDENTIALS_REQUIRED.getMessage()))
+                    .verify();
+        }
+        verifyNoInteractions(accounts, passwords, tokens);
+    }
+
+    @Test
+    void normalizesEmailButKeepsPasswordUntouched() {
+        var accounts = mock(IAccountPersistencePort.class);
+        var passwords = mock(IPasswordVerifierPort.class);
+        var tokens = mock(ITokenProviderPort.class);
+        when(accounts.findByEmail("admin@example.com")).thenReturn(Mono.empty());
+
+        StepVerifier.create(new AuthenticationUseCase(accounts, passwords, tokens)
+                        .login(new LoginCredentials(" ADMIN@example.com ", " secret ")))
+                .expectError(AuthenticationException.class).verify();
+        verify(accounts).findByEmail("admin@example.com");
     }
 }

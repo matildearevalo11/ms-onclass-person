@@ -11,6 +11,7 @@ import com.pragma.powerup.domain.spi.ITokenProviderPort;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
+import static com.pragma.powerup.domain.util.DomainValidations.requireText;
 
 @RequiredArgsConstructor
 public class AuthenticationUseCase implements IAuthenticationServicePort {
@@ -20,10 +21,21 @@ public class AuthenticationUseCase implements IAuthenticationServicePort {
 
     @Override
     public Mono<AccessToken> login(LoginCredentials credentials) {
-        return Mono.defer(() -> accounts.findByEmail(credentials.getEmail().strip().toLowerCase(Locale.ROOT))
-                    .switchIfEmpty(Mono.error(new AuthenticationException(ExceptionMessages.INVALID_CREDENTIALS.getMessage())))
-                    .flatMap(account -> passwords.matches(credentials.getPassword(), account.getPasswordHash())
-                            .flatMap(matches -> Boolean.TRUE.equals(matches) ? tokens.generate(account)
-                                    : Mono.error(new AuthenticationException(ExceptionMessages.INVALID_CREDENTIALS.getMessage())))));
+        return Mono.fromCallable(() -> validate(credentials))
+                .flatMap(valid -> accounts.findByEmail(valid.getEmail())
+                        .switchIfEmpty(Mono.error(invalidCredentials()))
+                        .flatMap(account -> passwords.matches(valid.getPassword(), account.getPasswordHash())
+                                .flatMap(matches -> Boolean.TRUE.equals(matches)
+                                        ? tokens.generate(account) : Mono.error(invalidCredentials()))));
+    }
+
+    private LoginCredentials validate(LoginCredentials credentials) {
+        String email = requireText(credentials.getEmail(), ExceptionMessages.CREDENTIALS_REQUIRED);
+        requireText(credentials.getPassword(), ExceptionMessages.CREDENTIALS_REQUIRED);
+        return new LoginCredentials(email.toLowerCase(Locale.ROOT), credentials.getPassword());
+    }
+
+    private AuthenticationException invalidCredentials() {
+        return new AuthenticationException(ExceptionMessages.INVALID_CREDENTIALS.getMessage());
     }
 }
