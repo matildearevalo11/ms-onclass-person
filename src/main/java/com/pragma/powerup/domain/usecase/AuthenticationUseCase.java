@@ -23,7 +23,7 @@ public class AuthenticationUseCase implements IAuthenticationServicePort {
         return Mono.defer(() -> accounts.findByEmail(credentials.getEmail().strip().toLowerCase(Locale.ROOT))
                     .switchIfEmpty(Mono.error(new AuthenticationException(ExceptionMessages.INVALID_CREDENTIALS.getMessage())))
                     .flatMap(account -> passwords.matches(credentials.getPassword(), account.getPasswordHash())
-                            .flatMap(matches -> matches ? tokens.generate(account)
+                            .flatMap(matches -> Boolean.TRUE.equals(matches) ? tokens.generate(account)
                                     : Mono.error(new AuthenticationException(ExceptionMessages.INVALID_CREDENTIALS.getMessage())))));
     }
 }
